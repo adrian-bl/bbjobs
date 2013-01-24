@@ -13,10 +13,12 @@ void xdie(char *msg) {
 	exit(1);
 }
 
+
 int main(int argc, char **argv) {
 	LS_LONG_INT jobid;
 	int cc;
 	int jopts = 0;
+	int jobidx;
 	char *juser = NULL;
 	
 	if(lsb_init(argv[0]) < 0) 
@@ -59,12 +61,14 @@ int main(int argc, char **argv) {
 	if(optind < argc) {
 		while(optind < argc) {
 			jobid = atoi(argv[optind]);
+			jobidx = parse_jobidx(argv[optind]);
+
 			if(jobid == 0 && memcmp(argv[optind], "0", 1) != 0) {
 				fprintf(stderr, "WARNING: ignoring invalid argument: %s\n", argv[optind]);
 			}
 			else {
 				/* we have a specific jobid -> ingore 'juser' */
-				if( get_jobinfo(jobid, ALL_JOB, "all") == 0 )
+				if( get_jobinfo(jobid, jobidx, ALL_JOB, "all") == 0 )
 					printf("Job <%llu> is not found\n", jobid);
 			}
 			optind++;
@@ -72,7 +76,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	else { /* no jobid -> filter by 'juser' */
-		if( get_jobinfo(0, jopts, juser) == 0 )
+		if( get_jobinfo(0, -1, jopts, juser) == 0 )
 			printf("No jobs found for %s\n", juser);
 	}
 	
@@ -82,7 +86,7 @@ int main(int argc, char **argv) {
 /*
 ** Display all jobs that match given filter
 */
-int get_jobinfo(LS_LONG_INT jobid, int jobopts, char *jobuser) {
+int get_jobinfo(LS_LONG_INT jobid, int jobidx, int jobopts, char *jobuser) {
 	struct jobInfoHead *jInfoH;
 	struct jobInfoEnt *job;
 	int i = 0;
@@ -97,10 +101,14 @@ int get_jobinfo(LS_LONG_INT jobid, int jobopts, char *jobuser) {
 		job = lsb_readjobinfo(NULL);
 		if(job == NULL)
 			xdie("failed to get jobinfo");
+
+		if(jobidx >= 0 && job->counter[JGRP_COUNT_NJOBS] > 0 && LSB_ARRAY_IDX(job->jobId) != jobidx) {
+			continue;
+		}
 		
 		print_single_job(job);
 		
-		if(i+1 != jInfoH->numJobs) printf("\n");
+		if(jobidx < 0 && i+1 != jInfoH->numJobs) printf("\n");
 	}
 	
 	EARLY_RETURN:
@@ -131,8 +139,6 @@ void print_single_job(struct jobInfoEnt *job) {
 	cpu_time  = job->runRusage.stime;
 	rq_mem    = get_rr_mem(job->submit.resReq);
 
-printf(">> %Lg = %Lg + %Lg\n", cpu_time, job->runRusage.utime, job->runRusage.stime );
-	
 	/* if in parseable mode: notify printer about current jobid */
 	pr_set_prefix( LSB_ARRAY_JOBID(job->jobId) );
 	
@@ -261,3 +267,17 @@ void print_exec_hosts(struct jobInfoEnt *job) {
 	}
 	printf("\n");
 }
+
+
+/* Extracts the jobindex part out of a string such as 12345[333] */
+int parse_jobidx(char *str) {
+	char *start;
+	int rv = -1;
+
+	start = index(str, '[');
+	if(start != NULL && strlen(start) > 1)
+		rv = atoi(start+1);
+
+	return rv;
+}
+

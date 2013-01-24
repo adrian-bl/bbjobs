@@ -15,6 +15,9 @@ void print_single_job(struct jobInfoEnt *job);
 void print_exec_hosts(struct jobInfoEnt *job);
 
 
-int get_jobinfo(LS_LONG_INT jobid, int jobopts, char *jobuser);
+int get_jobinfo(LS_LONG_INT jobid, int jobidx, int jobopts, char *jobuser);
 
 void pr_duration(char *desc, time_t sec);
+
+int parse_jobidx(char *str);
+
