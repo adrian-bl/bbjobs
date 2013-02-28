@@ -124,10 +124,12 @@ int get_jobinfo(LS_LONG_INT jobid, int jobidx, int jobopts, char *jobuser) {
 void print_single_job(struct jobInfoEnt *job) {
 	time_t wc_time;   /* Wallclock time in seconds */
 	double cpu_time;  /* CPU time in seconds       */
+	double sys_time;  /* System time in seconds    */
 	time_t wait_time; /* Time idle in queue in sec */
 	time_t rq_mem;       /* Requested RAM in MB       */
 	double muti;      /* Memory Utilization        */
 	double peff;      /* CPU Eff.                  */
+	double sysp;      /* SYS time wasted           */
 	
 	
 	/* Calculate some handy values
@@ -136,7 +138,7 @@ void print_single_job(struct jobInfoEnt *job) {
 	wait_time = (job->startTime ? job->startTime : time(NULL))-job->submitTime;
 	wc_time   = job->jRusageUpdateTime - job->startTime;
 	cpu_time  = (double) ( (double)job->runRusage.utime + (double)job->runRusage.stime );
-	cpu_time  = job->runRusage.stime;
+	sys_time  = job->runRusage.stime;
 	rq_mem    = get_rr_mem(job->submit.resReq);
 
 	/* if in parseable mode: notify printer about current jobid */
@@ -222,6 +224,7 @@ void print_single_job(struct jobInfoEnt *job) {
 	if( HAS_STATS(job) ) {
 		/* This information is only available it the job ever entered into RUN state */
 		peff = (wc_time > 0 ? (cpu_time / (double)(job->submit.numProcessors * wc_time ))*100               : 0);
+		sysp = (wc_time > 0 ? (sys_time / (double)(job->submit.numProcessors * wc_time ))*100               : 0);
 		muti = (rq_mem  > 0 ? (job->runRusage.swap/1024 / (double)(job->submit.numProcessors * rq_mem))*100 : 0);
 		pr_fancy("Resource usage");
 		pr_ts("Updated at", job->jRusageUpdateTime);
@@ -229,9 +232,9 @@ void print_single_job(struct jobInfoEnt *job) {
 		pr_int("Tasks", job->runRusage.nthreads);
 		pr_duration("Total CPU time", cpu_time);
 		pr_prct("CPU utilization", peff);
+		pr_prct("Sys/Kernel time", sysp);
 		pr_lhand("Total Memory"); printf("%d MB\n", job->runRusage.swap/1024);
 		pr_prct("Memory utilization", muti);
-		
 	}
 
 }
